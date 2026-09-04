@@ -454,12 +454,30 @@ export async function executeAgentTurn(userMessage, chatHistory = []) {
 
     const data = await response.json();
 
-    return {
-      text: data.reply,
-      productIds: data.productIds || [],
-      nearestAlternative: data.nearestAlternative || null,
-      auditEntry: data.auditEntry || null
-    };
+// Mirror backend audit events into the frontend audit stream
+let frontendAuditEntry = null;
+
+if (data.auditEntry) {
+  frontendAuditEntry = auditLogger.log({
+    userQuery: data.auditEntry.userQuery || userMessage,
+    reasoningSummary:
+      data.auditEntry.reasoningSummary ||
+      'Backend agent evaluated the customer request.',
+    toolName: data.auditEntry.toolName || 'search_catalog',
+    toolInput: data.auditEntry.toolInput || {},
+    toolResult: data.auditEntry.toolResult || {},
+    matchedProductIds: data.auditEntry.matchedProductIds || [],
+    status: data.auditEntry.status || 'SUCCESS',
+    executionMs: data.auditEntry.executionMs || 0
+  });
+}
+
+return {
+  text: data.reply,
+  productIds: data.productIds || [],
+  nearestAlternative: data.nearestAlternative || null,
+  auditEntry: frontendAuditEntry || data.auditEntry || null
+};
 
   } catch (error) {
     console.warn(
